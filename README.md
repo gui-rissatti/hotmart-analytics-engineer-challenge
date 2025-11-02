@@ -1,22 +1,8 @@
-# Desafio Técnico - Analytics Engineer Sênior | Hotmart
-
-> **Candidato:** [Seu Nome]  
-> **Data:** Novembro 2025  
-> **Posição:** Analytics Engineer Sênior
-
----
+# Desafio Técnico - Hotmart | Analytics Engineer | Guilherme Rissatti Malheiros
 
 ## 📌 Visão Geral
 
-Este repositório contém a solução completa para o desafio técnico de Analytics Engineer da Hotmart, demonstrando expertise em:
-
-- **SQL Analítico Avançado** (Exercício 1)
-- **Engenharia de Dados com PySpark** (Exercício 2)
-- **Modelagem Dimensional Histórica** (SCD Type 2)
-- **Data Quality & Observabilidade**
-- **Arquitetura Escalável e Auditável**
-
----
+Este repositório contém a solução completa para o teste técnico para Analytics Engineer enviado por e-mail em 31/10
 
 ## 🏗️ Estrutura do Repositório
 
