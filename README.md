@@ -60,7 +60,7 @@ Este repositório contém a solução completa para o teste técnico para Analyt
 - Join entre `purchase` e `product_item` considerando relacionamento 1:N
 - Tratamento de empates (ROW_NUMBER vs RANK)
 
-📂 **Localização:** [`exercise_1_sql/`](./query_1/)
+📂 **Localização:** [`ex_1/`](./ex_1/)
 
 ---
 
