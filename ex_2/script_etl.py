@@ -1,14 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-# Script: etl_consolidated_purchase_daily.py
-# Objetivo:
-# - Consolidar três tabelas de evento (purchases, product_items, purchase_extra_info) em "foto diária" D-1
-# - Persistir uma linha por purchase_id por dia (snapshot_date), repetindo campos não atualizados (carry-forward)
-# - Calcular e armazenar GMV somente a partir de purchase_value
-# - Escrever em S3 no formato Parquet particionado por snapshot_date
-# - Usar apenas JOB_NAME como argumento do Job, deixando todo o resto no código
-
 import sys
 import logging
 from datetime import datetime, timedelta, date
@@ -19,13 +8,10 @@ from awsglue.job import Job
 from pyspark.context import SparkContext
 from pyspark.sql import functions as F
 from pyspark.sql import Window
-from pyspark.sql.types import (
-    StructType, StructField, StringType, DateType, DecimalType,
-    BooleanType, TimestampType
-)
+from pyspark.sql.types import (StructType, StructField, StringType, DateType, DecimalType, BooleanType, TimestampType)
 
 # =========================
-# Parâmetros do Job (apenas JOB_NAME)
+# Parâmetros do Job
 # =========================
 args = getResolvedOptions(sys.argv, ['JOB_NAME'])
 
@@ -35,12 +21,9 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-# Overwrite dinâmico só na(s) partição(ões) tocada(s)
+# Overwrite dinâmico só na partição
 spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
 
-# =========================
-# Logging simples e legível
-# =========================
 logger = logging.getLogger('consolidation')
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -48,20 +31,20 @@ if not logger.handlers:
 logger.info("Início do job de consolidação diária D-1")
 
 # =========================
-# Constantes de I/O (edite antes de executar)
+# Constantes de I/O
 # =========================
-S3_SOURCE_PURCHASES = "s3://SEU_BUCKET/raw/purchases"           # editar
-S3_SOURCE_ITEMS = "s3://SEU_BUCKET/raw/product_items"           # editar
-S3_SOURCE_EXTRA = "s3://SEU_BUCKET/raw/purchase_extra_info"     # editar
-S3_TARGET_CONSOLIDATED = "s3://SEU_BUCKET/curated/consolidated_purchase_daily"  # editar
+S3_SOURCE_PURCHASES = "s3://hotmart-datalake-prod/transactions/purchases"
+S3_SOURCE_ITEMS = "s3://hotmart-datalake-prod/transactions/product_items"
+S3_SOURCE_EXTRA = "s3://hotmart-datalake-prod/transactions/purchase_extra_info"
+S3_TARGET_CONSOLIDATED = "s3://hotmart-datalake-prod/tables/consolidated_purchase_daily"
 
 # =========================
 # Datas de processamento
 # =========================
-# D-1 em UTC; ajuste o agendamento conforme política da empresa
-process_date = (datetime.utcnow().date() - timedelta(days=1))
+# D-1
+process_date = datetime.utcnow().date()
 prev_date = process_date - timedelta(days=1)
-logger.info(f"process_date={process_date} | prev_date={prev_date}")
+logger.info(f"process_date={process_date} (HOJE/D-0) | prev_date={prev_date} (ONTEM/D-1)")
 
 # =========================
 # Esquema do snapshot final
@@ -76,7 +59,7 @@ SNAPSHOT_SCHEMA = StructType([
     StructField("status", StringType(), True),
     StructField("is_paid", BooleanType(), True),
     StructField("subsidiary", StringType(), True),
-    StructField("gmv", DecimalType(18, 2), True),  # do campo purchase_value
+    StructField("gmv", DecimalType(18, 2), True), 
     StructField("src_purchase_ts", TimestampType(), True),
     StructField("src_items_ts", TimestampType(), True),
     StructField("src_extra_ts", TimestampType(), True),
@@ -156,7 +139,7 @@ logger.info(f"Eventos do dia: purchases={purchases_day.count()} | items={items_d
 p_cols = [c for c in ["purchase_id", "buyer_id", "producer_id", "order_date", "release_date", "status", "purchase_value"] if c in purchases_day.columns]
 purchases_sel = purchases_day.select(*p_cols, "event_ts").withColumnRenamed("event_ts", "src_purchase_ts")
 
-# Items: apenas timestamp agregado por purchase_id para auditoria (não entra no GMV)
+# Items: apenas timestamp agregado por purchase_id para controle
 items_agg = (
     items_day.groupBy("purchase_id")
     .agg(F.max("event_ts").alias("src_items_ts"))
@@ -190,7 +173,7 @@ prev_snap = (
 )
 
 # =========================
-# Consolidação e carry-forward
+# Consolidação e carry-forward (lógica de atualização)
 # =========================
 base_today = (
     keys_today
@@ -212,7 +195,7 @@ consolidated = base_today.select(
     F.coalesce(safe_bool_paid(F.col("status")), F.col("prev_snap.is_paid")).alias("is_paid"),
     F.coalesce(F.col("subsidiary"), F.col("prev_snap.subsidiary")).alias("subsidiary"),
 
-    # GMV somente via purchase_value; se ausente no dia, manter valor anterior
+    # GMV via purchase_value; se ausente no dia, manter valor anterior
     F.coalesce(F.col("purchase_value").cast(DecimalType(18, 2)), F.col("prev_snap.gmv")).alias("gmv"),
 
     F.col("src_purchase_ts").cast("timestamp"),
