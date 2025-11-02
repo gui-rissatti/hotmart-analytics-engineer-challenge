@@ -100,6 +100,8 @@ ORDER BY producer_id, faturamento DESC;
 
 ## Exercício 2: Pipeline ETL e GMV Diário por Subsidiária
 
+Neste exercício, foi simulado um ambiente de produção AWS, onde um Glue Job em PySpark foi criado para a solução do problema. Para esse exercício, o setup de configurações de ambiente foi ignorado.
+
 ### Objetivo
 
 Construir pipeline ETL que processa eventos assíncronos das tabelas `purchase`, `product_item` e `purchase_extra_info`, gerando tabela consolidada particionada por `snapshot_date` (D-1) que suporte:
@@ -310,3 +312,4 @@ WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM consolidated_purchase_dail
 | Particionamento por snapshot_date | Isolamento temporal; reprocessamento eficiente | Consultas temporais complexas (JOIN com múltiplas partições) | Requisito de rastreabilidade diária e D-1 |
 | PySpark/Glue (não SQL puro) | Escalabilidade; transformações complexas; integração AWS | Curva de aprendizado; custo de infra Spark | Volume de dados (3 tabelas fonte) e requisito de forward fill justificam Spark |
 
+* a documentação técnica feita deste projeto foi feita com ajuda de GenAI
